@@ -1,0 +1,130 @@
+{% extends "core/base.html" %}
+{% block title %}{{ cartao.titulo }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+        <a class="small text-decoration-none" href="{% url 'core:acampamento_detail' cartao.lista.acampamento_id %}">← {{ cartao.lista.acampamento.nome }} · {{ cartao.lista.nome }}</a>
+        <h1 class="h3 mt-2 mb-0">{{ cartao.titulo }}</h1>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'core:cartao_copy' cartao.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-primary btn-sm" type="submit">Copiar cartão</button>
+        </form>
+        <form method="post" action="{% url 'core:cartao_delete' cartao.pk %}" onsubmit="return confirm('Excluir este cartão e seus anexos?')">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm" type="submit">Excluir</button>
+        </form>
+    </div>
+</div>
+<div class="row g-3">
+    <div class="col-lg-7">
+        <section class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.name == "etiquetas" and not etiquetas_disponiveis %}
+                                <div class="form-text">Crie etiquetas no quadro para usá-las nos cartões.</div>
+                            {% endif %}
+                            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endfor %}
+                    <hr>
+                    <h2 class="h5">Checklist</h2>
+                    <p class="small text-secondary">Adicione etapas e marque o que já foi concluído.</p>
+                    {{ checklist_formset.management_form }}
+                    {% for checklist_form in checklist_formset %}
+                        <div class="row align-items-center g-2 border-bottom py-2">
+                            {% for hidden in checklist_form.hidden_fields %}{{ hidden }}{% endfor %}
+                            <div class="col">
+                                {{ checklist_form.descricao }}
+                                {% for error in checklist_form.descricao.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    {{ checklist_form.concluido }}
+                                    <label class="form-check-label" for="{{ checklist_form.concluido.id_for_label }}">Concluído</label>
+                                </div>
+                            </div>
+                            {% if checklist_form.DELETE %}
+                                <div class="col-auto">
+                                    <div class="form-check text-danger">{{ checklist_form.DELETE }}<label class="form-check-label" for="{{ checklist_form.DELETE.id_for_label }}">Remover</label></div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    {% for error in checklist_formset.non_form_errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    <div class="text-end mt-3">
+                        <button class="btn btn-success" type="submit">Salvar cartão</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 mb-0">Anexos</h2>
+                </div>
+                <form method="post" enctype="multipart/form-data" action="{% url 'core:anexo_create' cartao.pk %}" class="mb-3">
+                    {% csrf_token %}
+                    <label class="form-label small" for="arquivos">Adicionar arquivos (até 50 MB cada)</label>
+                    <input class="form-control" id="arquivos" name="arquivos" type="file" multiple>
+                    <button class="btn btn-outline-secondary btn-sm mt-2" type="submit">Anexar</button>
+                </form>
+                <div class="list-group list-group-flush">
+                    {% for anexo in cartao.anexos.all %}
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2">
+                            <div class="text-truncate">
+                                <a href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener">{{ anexo.nome }}</a>
+                                <div class="small text-secondary">{{ anexo.enviado_em|date:"d/m/Y H:i" }}</div>
+                            </div>
+                            <form method="post" action="{% url 'core:anexo_delete' anexo.pk %}">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Remover anexo">×</button>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <p class="small text-secondary mb-0">Nenhum anexo ainda.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Comentários e atividade</h2>
+                {% if request.user.is_authenticated %}
+                    <form method="post" action="{% url 'core:comentario_create' cartao.pk %}" class="mb-3">
+                        {% csrf_token %}
+                        {{ comentario_form.texto }}
+                        <button class="btn btn-success btn-sm mt-2" type="submit">Comentar</button>
+                    </form>
+                {% else %}
+                    <p class="small text-secondary"><a href="{% url 'core:login' %}?next={{ request.path|urlencode }}">Entre</a> para comentar com seu usuário.</p>
+                {% endif %}
+                <div class="activity-feed">
+                    {% for data_evento, tipo, item in feed %}
+                        <div class="border-top py-2">
+                            {% if tipo == "comentario" %}
+                                <strong>{{ item.autor.get_username }}</strong>
+                                <span class="text-secondary small">{{ item.criado_em|date:"d/m/Y H:i" }}</span>
+                                <div>{{ item.texto|linebreaksbr }}</div>
+                            {% else %}
+                                <span class="text-secondary">{{ item.usuario.get_username|default:"Equipe" }} {{ item.texto }}</span>
+                                <div class="small text-secondary">{{ item.criado_em|date:"d/m/Y H:i" }}</div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p class="small text-secondary">Nenhuma atividade registrada.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

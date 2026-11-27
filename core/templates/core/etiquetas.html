@@ -1,0 +1,32 @@
+{% extends "core/base.html" %}
+{% block title %}Etiquetas{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body p-4">
+                <h1 class="h3">Etiquetas · {{ acampamento.nome }}</h1>
+                <form method="post" action="{% url 'core:etiqueta_create' acampamento.pk %}" class="row g-2 align-items-end">
+                    {% csrf_token %}
+                    <div class="col">{{ form.nome.label_tag }}{{ form.nome }}</div>
+                    <div class="col-auto">{{ form.cor.label_tag }}{{ form.cor }}</div>
+                    <div class="col-12"><button class="btn btn-success" type="submit">Criar etiqueta</button></div>
+                </form>
+            </div>
+        </div>
+        <div class="card shadow-sm">
+            <ul class="list-group list-group-flush">
+                {% for etiqueta in etiquetas %}
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <span class="card-label" style="background-color: {{ etiqueta.cor }}; width: 2rem;"></span>
+                        {{ etiqueta.nome }}
+                    </li>
+                {% empty %}
+                    <li class="list-group-item text-secondary">Nenhuma etiqueta criada.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <a class="btn btn-outline-secondary mt-3" href="{% url 'core:acampamento_detail' acampamento.pk %}">Voltar ao quadro</a>
+    </div>
+</div>
+{% endblock %}

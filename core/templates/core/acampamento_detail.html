@@ -1,0 +1,224 @@
+{% extends "core/base.html" %}
+{% block title %}Quadro · {{ acampamento.nome }}{% endblock %}
+{% block extra_head %}
+<style>
+    .board-scroll { overflow-x: auto; padding-bottom: 1rem; }
+    .board-lists { display: flex; align-items: flex-start; gap: .75rem; min-height: 65vh; width: max-content; }
+    .board-column { width: 285px; max-height: calc(100vh - 190px); overflow-y: auto; background: #e9ecef; border-radius: .75rem; padding: .6rem; }
+    .board-column.drop-target { outline: 2px dashed #198754; background: #e2f1e7; }
+    .column-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .2rem .25rem .55rem; }
+    .column-title { font-size: .98rem; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+    .column-date { font-size: .75rem; color: #64736a; }
+    .column-menu summary { list-style: none; cursor: pointer; color: #65736b; padding: .25rem .45rem; }
+    .column-menu summary::-webkit-details-marker { display: none; }
+    .column-menu-panel { position: absolute; z-index: 5; right: 0; width: 230px; padding: .65rem; background: #fff; border: 1px solid #ced4da; border-radius: .5rem; box-shadow: 0 .25rem .6rem #0002; }
+    .list-cards { min-height: 60px; }
+    .board-card { background: #fff; border: 1px solid #d5d9dc; border-radius: .5rem; padding: .65rem; margin-bottom: .55rem; box-shadow: 0 1px 2px #0001; cursor: grab; }
+    .board-card:active { cursor: grabbing; }
+    .board-card.dragging { opacity: .4; }
+    .board-card-title { display: block; color: #26332c; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+    .board-card-title:hover { color: #146c43; }
+    .card-labels { display: flex; flex-wrap: wrap; gap: .25rem; margin-bottom: .4rem; }
+    .card-label { display: inline-block; min-width: 2.2rem; height: .45rem; border-radius: 1rem; }
+    .card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin-top: .5rem; color: #66736b; font-size: .78rem; }
+    .card-meta .late { color: #b02a37; font-weight: 700; }
+    .member-stack { display: flex; margin-left: auto; }
+    .member-avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem; margin-left: -.25rem; border: 2px solid white; border-radius: 50%; background: #547a64; color: #fff; font-size: .68rem; font-weight: 700; }
+    .add-card-form { display: flex; gap: .35rem; padding-top: .3rem; }
+    .add-list-column { width: 285px; padding: .6rem; background: #ffffff9e; border-radius: .75rem; }
+    .print-card-detail { display: none; }
+    @media (max-width: 575px) {
+        .board-column, .add-list-column { width: 82vw; max-height: calc(100vh - 150px); }
+    }
+    @media print {
+        .board-scroll { overflow: visible; }
+        .board-lists { display: block; width: auto; }
+        .board-column { width: 100%; max-height: none; overflow: visible; break-inside: auto; background: #fff; border: 1px solid #bbb; margin-bottom: 1rem; }
+        .board-card { break-inside: avoid; box-shadow: none; cursor: default; }
+        .print-card-detail { display: block; font-size: .82rem; margin-top: .6rem; }
+        .no-print, .column-menu, .add-list-column, .add-card-form { display: none !important; }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <a class="small text-decoration-none no-print" href="{% url 'core:acampamento_list' %}">← Acampamentos</a>
+        <h1 class="h2 mt-1 mb-1">{{ acampamento.nome }}</h1>
+        <p class="text-secondary mb-0">{{ acampamento.data_inicio|date:"d/m/Y" }} – {{ acampamento.data_fim|date:"d/m/Y" }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 no-print">
+        <a class="btn btn-outline-success btn-sm" href="{% url 'core:etiqueta_manage' acampamento.pk %}">Etiquetas</a>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'core:acampamento_copy' acampamento.pk %}">Copiar acampamento</a>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Imprimir</button>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:acampamento_update' acampamento.pk %}">Editar acampamento</a>
+    </div>
+</div>
+<div id="board-error" class="alert alert-danger d-none no-print" role="alert"></div>
+<p class="small text-secondary no-print">Arraste cartões entre listas para mover ou reordenar. Clique em um cartão para abrir detalhes, checklist, prazo, membros, etiquetas e anexos.</p>
+<div class="board-scroll">
+    <div class="board-lists">
+        {% for lista in listas %}
+            <section class="board-column" data-list-id="{{ lista.pk }}" aria-label="Lista {{ lista.nome }}">
+                <header class="column-header">
+                    <div class="min-w-0">
+                        <h2 class="column-title">{{ lista.nome }}</h2>
+                        {% if lista.data %}<div class="column-date">{{ lista.data|date:"l, d/m/Y" }}</div>{% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="small text-secondary">{{ lista.cartoes.count }}</span>
+                        <details class="column-menu position-relative">
+                            <summary aria-label="Opções da lista">•••</summary>
+                            <div class="column-menu-panel">
+                                <form method="post" action="{% url 'core:lista_update' lista.pk %}" class="mb-2">
+                                    {% csrf_token %}
+                                    <label class="form-label small" for="list-name-{{ lista.pk }}">Renomear lista</label>
+                                    <input id="list-name-{{ lista.pk }}" class="form-control form-control-sm mb-2" name="nome" value="{{ lista.nome }}" required>
+                                    <button class="btn btn-sm btn-success w-100" type="submit">Salvar nome</button>
+                                </form>
+                                {% if lista.data %}
+                                    <a class="btn btn-sm btn-outline-primary w-100 mb-2" href="{% url 'core:lista_copy' lista.pk %}">Copiar dia para...</a>
+                                {% elif not lista.cartoes.count %}
+                                    <form method="post" action="{% url 'core:lista_delete' lista.pk %}" onsubmit="return confirm('Excluir esta lista?')">
+                                        {% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-danger w-100" type="submit">Excluir lista</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </details>
+                    </div>
+                </header>
+                <div class="list-cards" data-list-id="{{ lista.pk }}">
+                    {% for cartao in lista.cartoes.all %}
+                        <article class="board-card" draggable="true" data-card-id="{{ cartao.pk }}" data-move-url="{% url 'core:cartao_move' cartao.pk %}">
+                            {% if cartao.etiquetas.all %}
+                                <div class="card-labels">
+                                    {% for etiqueta in cartao.etiquetas.all %}
+                                        <span class="card-label" style="background-color: {{ etiqueta.cor }};" title="{{ etiqueta.nome }}"></span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <a class="board-card-title" href="{% url 'core:cartao_detail' cartao.pk %}">{{ cartao.titulo }}</a>
+                            {% if cartao.data_prazo or cartao.checklist_total or cartao.anexos_total %}
+                                <div class="card-meta">
+                                    {% if cartao.data_prazo %}
+                                        <span class="{% if cartao.prazo_atrasado %}late{% endif %}" title="Prazo">◷ {{ cartao.data_prazo|date:"d/m H:i" }}</span>
+                                    {% endif %}
+                                    {% if cartao.checklist_total %}<span title="Checklist">☑ {{ cartao.checklist_concluido }}/{{ cartao.checklist_total }}</span>{% endif %}
+                                    {% if cartao.anexos_total %}<span title="Anexos">📎 {{ cartao.anexos_total }}</span>{% endif %}
+                                    {% if cartao.membros_lista %}
+                                        <span class="member-stack">
+                                            {% for membro in cartao.membros_lista %}
+                                                <span class="member-avatar" title="{{ membro.get_username }}">{{ membro.get_username|slice:":1"|upper }}</span>
+                                            {% endfor %}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% elif cartao.membros_lista %}
+                                <div class="card-meta"><span class="member-stack">{% for membro in cartao.membros_lista %}<span class="member-avatar" title="{{ membro.get_username }}">{{ membro.get_username|slice:":1"|upper }}</span>{% endfor %}</span></div>
+                            {% endif %}
+                            <div class="print-card-detail">
+                                {% if cartao.publico_alvo %}<p class="mb-1"><strong>Público:</strong> {{ cartao.publico_alvo }}</p>{% endif %}
+                                {% if cartao.descricao %}<p class="mb-1"><strong>Descrição:</strong> {{ cartao.descricao|linebreaksbr }}</p>{% endif %}
+                                {% if cartao.passo_a_passo %}<p class="mb-1"><strong>Passo a passo:</strong> {{ cartao.passo_a_passo|linebreaksbr }}</p>{% endif %}
+                                {% if cartao.detalhes_adicionais %}<p class="mb-1"><strong>Detalhes adicionais:</strong> {{ cartao.detalhes_adicionais|linebreaksbr }}</p>{% endif %}
+                                {% if cartao.observacoes %}<p class="mb-1"><strong>Observações:</strong> {{ cartao.observacoes|linebreaksbr }}</p>{% endif %}
+                                {% if cartao.checklist_total %}
+                                    <strong>Checklist</strong>
+                                    <ul class="mb-0">
+                                        {% for item in cartao.checklist.all %}
+                                            <li>{% if item.concluido %}[x]{% else %}[ ]{% endif %} {{ item.descricao }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% empty %}
+                        <div class="small text-secondary py-2 drop-hint">Arraste um cartão para cá</div>
+                    {% endfor %}
+                </div>
+                <form method="post" action="{% url 'core:cartao_create' lista.pk %}" class="add-card-form no-print">
+                    {% csrf_token %}
+                    {{ cartao_form.titulo }}
+                    <button class="btn btn-sm btn-light" type="submit" aria-label="Adicionar cartão">+</button>
+                </form>
+            </section>
+        {% endfor %}
+        <section class="add-list-column no-print">
+            <form method="post" action="{% url 'core:lista_create' acampamento.pk %}">
+                {% csrf_token %}
+                <label class="form-label fw-semibold" for="new-list-name">Adicionar outra lista</label>
+                {{ lista_form.nome }}
+                <button class="btn btn-outline-success btn-sm mt-2" type="submit">Adicionar lista</button>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+    let dragging = null;
+    const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
+    const csrfToken = csrfInput ? csrfInput.value : "";
+    const errorBox = document.getElementById("board-error");
+
+    document.querySelectorAll(".board-card").forEach((card) => {
+        card.addEventListener("dragstart", (event) => {
+            dragging = card;
+            card.classList.add("dragging");
+            event.dataTransfer.setData("text/plain", card.dataset.cardId);
+            event.dataTransfer.effectAllowed = "move";
+        });
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+            document.querySelectorAll(".board-column").forEach((column) => column.classList.remove("drop-target"));
+            dragging = null;
+        });
+    });
+
+    document.querySelectorAll(".board-column").forEach((column) => {
+        const cardList = column.querySelector(".list-cards");
+        column.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            column.classList.add("drop-target");
+        });
+        column.addEventListener("dragleave", (event) => {
+            if (!column.contains(event.relatedTarget)) column.classList.remove("drop-target");
+        });
+        column.addEventListener("drop", async (event) => {
+            event.preventDefault();
+            column.classList.remove("drop-target");
+            const cardId = event.dataTransfer.getData("text/plain");
+            const card = dragging || document.querySelector(`[data-card-id="${cardId}"]`);
+            if (!card || !cardList) return;
+            const siblings = [...cardList.querySelectorAll(".board-card")].filter((item) => item !== card);
+            const target = event.target.closest(".board-card");
+            let position = siblings.length;
+            if (target && siblings.includes(target)) {
+                const bounds = target.getBoundingClientRect();
+                position = siblings.indexOf(target) + (event.clientY > bounds.top + bounds.height / 2 ? 1 : 0);
+            }
+            const body = new URLSearchParams({
+                csrfmiddlewaretoken: csrfToken,
+                lista_id: column.dataset.listId,
+                posicao: String(position)
+            });
+            try {
+                const response = await fetch(card.dataset.moveUrl, {
+                    method: "POST",
+                    headers: {"X-Requested-With": "XMLHttpRequest", "X-CSRFToken": csrfToken},
+                    body
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.erro || "Não foi possível mover o cartão.");
+                window.location.reload();
+            } catch (error) {
+                errorBox.textContent = error.message;
+                errorBox.classList.remove("d-none");
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

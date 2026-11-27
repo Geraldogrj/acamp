@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}
+{% block title %}Copiar dia{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3">Copiar cartões do dia</h1>
+                <p class="text-secondary">Os cartões de “{{ origem.nome }}” serão copiados para outro dia. Checklists serão reiniciados e prazos ajustados pela diferença entre as datas.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.destino.id_for_label }}">{{ form.destino.label }}</label>
+                        {{ form.destino }}
+                        {% for error in form.destino.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+                    <button class="btn btn-success" type="submit">Copiar cartões</button>
+                    <a class="btn btn-outline-secondary" href="{% url 'core:acampamento_detail' origem.acampamento_id %}">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

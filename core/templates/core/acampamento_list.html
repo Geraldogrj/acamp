@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% block title %}Acampamentos{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h2 mb-1">Acampamentos</h1>
+        <p class="text-secondary mb-0">Organize seus acampamentos em quadros colaborativos.</p>
+    </div>
+    <a class="btn btn-success" href="{% url 'core:acampamento_create' %}">Novo acampamento</a>
+</div>
+<div class="row g-3">
+    {% for acampamento in acampamentos %}
+        <div class="col-md-6 col-xl-4">
+            <article class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 card-title">{{ acampamento.nome }}</h2>
+                    <p class="text-secondary mb-3">{{ acampamento.data_inicio|date:"d/m/Y" }} – {{ acampamento.data_fim|date:"d/m/Y" }}</p>
+                    <a class="btn btn-outline-success btn-sm" href="{% url 'core:acampamento_detail' acampamento.pk %}">Abrir quadro</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'core:acampamento_update' acampamento.pk %}">Editar</a>
+                    <a class="btn btn-outline-primary btn-sm" href="{% url 'core:acampamento_copy' acampamento.pk %}">Copiar</a>
+                </div>
+            </article>
+        </div>
+    {% empty %}
+        <div class="col-12">
+            <div class="card card-body text-center py-5">
+                <p class="mb-3">Nenhum acampamento cadastrado.</p>
+                <a class="btn btn-success align-self-center" href="{% url 'core:acampamento_create' %}">Cadastrar o primeiro</a>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block title %}Copiar acampamento{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3">Copiar acampamento</h1>
+                <p class="text-secondary">“{{ origem.nome }}” será copiado com a mesma duração. As listas e cartões serão recriados, os checklists reiniciados e os prazos deslocados para as novas datas. Comentários não são copiados.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endfor %}
+                    <button class="btn btn-success" type="submit">Criar cópia</button>
+                    <a class="btn btn-outline-secondary" href="{% url 'core:acampamento_detail' origem.pk %}">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
