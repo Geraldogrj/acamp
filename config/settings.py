@@ -24,6 +24,14 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Railway termina o HTTPS no proxy; o Django precisa confiar no cabeçalho.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
